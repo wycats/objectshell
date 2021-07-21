@@ -41,6 +41,7 @@ impl WholeStreamCommand for AutoenvTrust {
                 dir
             }
         };
+        //println!("nu env path: {:#?}", file_to_trust);
         let quiet = args.has_flag("quiet");
 
         let content = std::fs::read(&file_to_trust)?;

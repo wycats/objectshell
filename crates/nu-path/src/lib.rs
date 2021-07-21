@@ -245,6 +245,18 @@ fn absolutize(path: impl AsRef<Path>) -> io::Result<PathBuf> {
 ///////////////////////////////////////////////////////////////////////////////
 // Full expansions
 
+// Re-create the path with unified separator
+// Side effect: this turns '/' into 'C:\', I guess that's ok
+fn reseparate(path: impl AsRef<Path>) -> PathBuf {
+    let mut result = PathBuf::with_capacity(path.as_ref().as_os_str().len());
+
+    for comp in path.as_ref().components() {
+        result.push(comp);
+    }
+
+    result
+}
+
 pub fn canonicalize(path: impl AsRef<Path>) -> io::Result<PathBuf> {
     let absolutized = absolutize(&path)?;
     let absolutized = expand_dots(Cow::Borrowed(&absolutized));
@@ -258,6 +270,7 @@ pub fn canonicalize(path: impl AsRef<Path>) -> io::Result<PathBuf> {
             }
         }
     };
+    let path = reseparate(path);
 
     Ok(dunce::simplified(&path).to_path_buf())
 }
@@ -329,19 +342,6 @@ mod tests {
 
         assert_eq!(
             canonicalize(full_path)?,
-            canonicalize_with(path, relative_to)?,
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn canonicalize_should_succeed() -> io::Result<()> {
-        let relative_to = Path::new("/foo/bar");
-        let path = Path::new("../..");
-
-        assert_eq!(
-            PathBuf::from("/"), // existing path
             canonicalize_with(path, relative_to)?,
         );
 
@@ -445,6 +445,19 @@ mod tests {
         use super::*;
 
         #[test]
+        fn canonicalize_should_succeed() -> io::Result<()> {
+            let relative_to = Path::new(r#"C:\foo/bar"#);
+            let path = Path::new("../..");
+
+            assert_eq!(
+                PathBuf::from(r#"C:\"#), // existing path
+                canonicalize_with(path, relative_to)?,
+            );
+
+            Ok(())
+        }
+
+        #[test]
         fn string_with_three_ndots() {
             check_ndots_expansion(r"..\..", "...");
         }
@@ -472,6 +485,20 @@ mod tests {
     #[cfg(not(windows))]
     mod non_windows {
         use super::*;
+
+        #[test]
+        fn canonicalize_should_succeed() -> io::Result<()> {
+            let relative_to = Path::new("/foo/bar");
+            let path = Path::new("../..");
+
+            assert_eq!(
+                PathBuf::from("/"), // existing path
+                canonicalize_with(path, relative_to)?,
+            );
+
+            Ok(())
+        }
+
         #[test]
         fn string_with_three_ndots() {
             check_ndots_expansion(r"../..", "...");
