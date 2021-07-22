@@ -152,6 +152,7 @@ impl DisplayPath for &String {
         (*self).to_string()
     }
 }
+
 pub enum Stub<'a> {
     FileWithContent(&'a str, &'a str),
     FileWithContentToBeTrimmed(&'a str, &'a str),
