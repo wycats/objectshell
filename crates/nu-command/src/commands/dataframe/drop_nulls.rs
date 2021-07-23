@@ -1,10 +1,7 @@
 use crate::prelude::*;
 use nu_engine::WholeStreamCommand;
 use nu_errors::ShellError;
-use nu_protocol::{
-    dataframe::{NuDataFrame, NuSeries, PolarsData},
-    Signature, SyntaxShape, UntaggedValue, Value,
-};
+use nu_protocol::{dataframe::NuDataFrame, Signature, SyntaxShape, UntaggedValue, Value};
 
 use super::utils::{convert_columns, parse_polars_error};
 
@@ -44,7 +41,7 @@ impl WholeStreamCommand for DataFrame {
             },
             Example {
                 description: "drop null values in dataframe",
-                example: r#"let s = ([1 2 0 0 3 4] | dataframe to-series);
+                example: r#"let s = ([1 2 0 0 3 4] | dataframe to-df);
     ($s / $s) | dataframe drop-nulls"#,
                 result: None,
             },
@@ -60,7 +57,7 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
     })?;
 
     match value.value {
-        UntaggedValue::DataFrame(PolarsData::EagerDataFrame(df)) => {
+        UntaggedValue::DataFrame(df) => {
             // Extracting the selection columns of the columns to perform the aggregation
             let columns: Option<Vec<Value>> = args.opt(0)?;
             let (subset, col_span) = match columns {
@@ -79,10 +76,6 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
                 .map_err(|e| parse_polars_error::<&str>(&e, &col_span, None))?;
 
             Ok(OutputStream::one(NuDataFrame::dataframe_to_value(res, tag)))
-        }
-        UntaggedValue::DataFrame(PolarsData::Series(series)) => {
-            let res = series.as_ref().drop_nulls();
-            Ok(OutputStream::one(NuSeries::series_to_value(res, tag)))
         }
         _ => Err(ShellError::labeled_error(
             "Incorrect type",

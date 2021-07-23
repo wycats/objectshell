@@ -8,15 +8,15 @@ pub struct DataFrame;
 
 impl WholeStreamCommand for DataFrame {
     fn name(&self) -> &str {
-        "dataframe arg-true"
+        "dataframe to-lowercase"
     }
 
     fn usage(&self) -> &str {
-        "[Series] Returns indexes where values are true"
+        "[Series] Lowercase the strings in the column"
     }
 
     fn signature(&self) -> Signature {
-        Signature::build("dataframe arg-true")
+        Signature::build("dataframe to-lowercase")
     }
 
     fn run(&self, args: CommandArgs) -> Result<OutputStream, ShellError> {
@@ -25,8 +25,8 @@ impl WholeStreamCommand for DataFrame {
 
     fn examples(&self) -> Vec<Example> {
         vec![Example {
-            description: "Returns indexes where values are true",
-            example: "[$false $true $false] | dataframe to-df | dataframe arg-true",
+            description: "Modifies strings to lowercase",
+            example: "[Abc aBc abC] | dataframe to-df | dataframe to-lowercase",
             result: None,
         }]
     }
@@ -38,17 +38,17 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
     let (df, df_tag) = NuDataFrame::try_from_stream(&mut args.input, &tag.span)?;
 
     let series = df.as_series(&df_tag.span)?;
-    let bool = series.bool().map_err(|e| {
+    let chunked = series.utf8().map_err(|e| {
         parse_polars_error::<&str>(
             &e,
-            &tag.span,
-            Some("arg-true only works with series of type bool"),
+            &df_tag.span,
+            Some("The to-lowercase command can only be used with string columns"),
         )
     })?;
 
-    let mut res = bool.arg_true().into_series();
-    res.rename("int");
+    let mut res = chunked.to_lowercase();
+    res.rename(series.name());
 
-    let df = NuDataFrame::try_from_series(vec![res], &tag.span)?;
+    let df = NuDataFrame::try_from_series(vec![res.into_series()], &tag.span)?;
     Ok(OutputStream::one(df.into_value(df_tag)))
 }

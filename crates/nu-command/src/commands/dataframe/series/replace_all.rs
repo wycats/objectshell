@@ -9,11 +9,11 @@ pub struct DataFrame;
 
 impl WholeStreamCommand for DataFrame {
     fn name(&self) -> &str {
-        "dataframe replace"
+        "dataframe replace-all"
     }
 
     fn usage(&self) -> &str {
-        "[Series] Replace the leftmost (sub)string by a regex pattern"
+        "[Series] Replace all (sub)strings by a regex pattern"
     }
 
     fn signature(&self) -> Signature {
@@ -39,7 +39,7 @@ impl WholeStreamCommand for DataFrame {
     fn examples(&self) -> Vec<Example> {
         vec![Example {
             description: "Replaces string",
-            example: "[abc abc abc] | dataframe to-df | dataframe replace -p ab -r AB",
+            example: "[abac abac abac] | dataframe to-df | dataframe replace-all -p a -r A",
             result: None,
         }]
     }
@@ -57,12 +57,12 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
         parse_polars_error::<&str>(
             &e,
             &df_tag.span,
-            Some("The replace-all command can only be used with string columns"),
+            Some("The replace command can only be used with string columns"),
         )
     })?;
 
     let mut res = chunked
-        .replace(pattern.as_str(), replace.as_str())
+        .replace_all(pattern.as_str(), replace.as_str())
         .map_err(|e| parse_polars_error::<&str>(&e, &tag.span, None))?;
 
     res.rename(series.name());

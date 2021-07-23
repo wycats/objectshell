@@ -1,10 +1,7 @@
 use crate::{commands::dataframe::utils::parse_polars_error, prelude::*};
 use nu_engine::WholeStreamCommand;
 use nu_errors::ShellError;
-use nu_protocol::{
-    dataframe::{NuSeries, PolarsData},
-    Signature, SyntaxShape, UntaggedValue, Value,
-};
+use nu_protocol::{dataframe::NuDataFrame, Signature, SyntaxShape, UntaggedValue, Value};
 use polars::prelude::IntoSeries;
 
 pub struct DataFrame;
@@ -29,8 +26,8 @@ impl WholeStreamCommand for DataFrame {
     fn examples(&self) -> Vec<Example> {
         vec![Example {
             description: "Checks if elements from a series are contained in right series",
-            example: r#"let other = ([1 3 6] | dataframe to-series);
-    [5 6 6 6 8 8 8] | dataframe to-series | dataframe is-in $other"#,
+            example: r#"let other = ([1 3 6] | dataframe to-df);
+    [5 6 6 6 8 8 8] | dataframe to-df | dataframe is-in $other"#,
             result: None,
         }]
     }
@@ -40,8 +37,8 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
     let tag = args.call_info.name_tag.clone();
     let value: Value = args.req(0)?;
 
-    let other = match value.value {
-        UntaggedValue::DataFrame(PolarsData::Series(series)) => Ok(series),
+    let other_df = match value.value {
+        UntaggedValue::DataFrame(df) => Ok(df),
         _ => Err(ShellError::labeled_error(
             "Incorrect type",
             "can only search in a series",
@@ -49,15 +46,15 @@ fn command(mut args: CommandArgs) -> Result<OutputStream, ShellError> {
         )),
     }?;
 
-    let series = NuSeries::try_from_stream(&mut args.input, &tag.span)?;
+    let other = other_df.as_series(&value.tag.span)?;
 
-    let res = series
-        .as_ref()
-        .is_in(other.as_ref())
+    let (df, df_tag) = NuDataFrame::try_from_stream(&mut args.input, &tag.span)?;
+
+    let res = df
+        .as_series(&df_tag.span)?
+        .is_in(&other)
         .map_err(|e| parse_polars_error::<&str>(&e, &tag.span, None))?;
 
-    Ok(OutputStream::one(NuSeries::series_to_value(
-        res.into_series(),
-        tag,
-    )))
+    let df = NuDataFrame::try_from_series(vec![res.into_series()], &tag.span)?;
+    Ok(OutputStream::one(df.into_value(df_tag)))
 }
